@@ -329,15 +329,11 @@ Set不保存重复的元素(至于如何判断元素相同则较为负责)
 
 存入Set的每个元素都必须是唯一的，因为Set不保存重复元素,加入Set的元素必须定义equals()方法以确保对象的唯一性。
 
-Set 是基于对象的值来确定归属性的。
-
- 
+Set 是基于对象的值来确定归属性的。 
 
 Set本身有去重功能是因为String内部重写了hashCode()和equals()方法，在add里实现了去重, Set集合是不允许重复元素的，但是集合是不知道我们对象的重复的判断依据的，默认情况下判断依据是判断两者是否为同一元素（euqals方法，依据是元素==元素），如果要依据我们自己的判断来判断元素是否重复，需要重写元素的equals方法（元素比较相等时调用）hashCode()的返回值是元素的哈希码，如果两个元素的哈希码相同，那么需要进行equals判断。【所以可以自定义返回值作为哈希码】 equals()返回true代表两元素相同，返回false代表不同。
 
 set集合没有索引，只能用迭代器或增强for循环遍历
-
- 
 
 set的底层是map集合
 
@@ -346,6 +342,60 @@ Set最多有一个null元素
 必须小心操作可变对象（Mutable Object）。如果一个Set中的可变元素改变了自身状态导致Object.equals(Object)=true将导致一些问题。
 
 Set具有与Collection完全一样的接口，没有额外的任何功能。所以把Set就是Collection，只是行为不同（这就是多态）；Set是基于对象的值来判断归属的，由于查询速度非常快速，HashSet使用了散列，HashSet维护的顺序与TreeSet或LinkedHashSet都不同，因为它们的数据结构都不同，元素存储方式自然也不同。TreeSet的数据结构是“红-黑树”，HashSet是散列函数，LinkedHashSet也用了散列函数；如果想要对结果进行排序，那么选择TreeSet代替HashSet是个不错的选择
+
+**HashSet类直接实现了Set接口， 其底层其实是包装了一个HashMap去实现的。HashSet采用HashCode算法来存取集合中的元素，因此具有比较好的读取和查找性能。**
+
+![1583846340264](/Users/awakeyoyoyo/Desktop/Java_Development_Note/images/1583846340264.jpg)
+
+**元素值可以为NULL,但只能放入一个null**
+
+　     **HashSet集合保证元素唯一性：通过元素的hashCode方法，和equals方法完成的。**
+
+ 
+
+当元素的hashCode值相同时，才继续判断元素的equals是否为true。
+
+如果hashCode值不同，那么不判断equals，从而提高对象比较的速度。
+
+**对于HashSet集合，判断元素是否存在，或者删除元素，底层依据的是hashCode方法和equals方法。**　　
+
+特点：存储取出都比较快
+
+1、不能保证元素的排列顺序，顺序可能与添加顺序不同，顺序也有可能发生变化。
+
+2、HashSet不是同步的，必须通过代码来保证其同步。
+
+3、集合元素可以是null,但只能有一个
+
+原理：简单说就是链表数组结合体
+
+**对象的哈希值：普通的一个整数,可以理解为身份证号，是hashset存储的依据***
+
+HashSet按Hash算法来存储集合中的元素。在存取和查找上有很好的性能。
+
+当向HashSet集合中存入一个元素时，HashSet会调用该对象的hashCode()方法来得到该对象的hashCode值，然后根据该hashCode值决定该hashCode值决定该对象在HashSet中存储的位置。
+
+如果有两个元素通过equals()方法比较返回true,但它们的hashCode()方法返回值不相等,hashSet将会把它们存储在不同位置，依然可以添加成功。如果两个对象的hashCode()方法返回的hashCode值相同，当它们的equals()方法返回false时，会在hashCode所在位置采用链式结构保存多个对象。这样会降低hashSet的查询性能。
+
+ #### 在使用HashSet中重写hashCode()方法的基本原则
+
+**1、在程序运行过过程中，同一个对象多次调用hashCode()方法应该返回相同的值。**
+
+**2、当两个对象的equals()方法比较返回true时，这个两个对象的hashCode()方法返回相同的值。**
+
+**3、对象中用作equals()方法比较标准的实例变量，都应该用于计算hashCode值。 **
+
+把对象内的每个意义的实例变量(即每个参与equals()方法比较标准的实例变量)计算出一个int类型的hashCode值。用第1步计算出来的多个hashCode值组合计算出一个hashCode值返回 
+
+ **return f1.hashCode()+(int)f2;** 
+
+为了避免直接相加产生的偶然相等(两个对象的f1、f2实例变量并不相等，但他们的hashCode的和恰好相等)，可以通过为各个实例变量的hashCode值乘以一个质数后再相加
+
+ **return f1.hashCode()\*19+f2.hashCode()\*37;** 
+
+如果向HashSet中添加一个可变的对象后，后面的程序修改了该可变对想的实例变量，则可能导致它与集合中的其他元素的相同（即两个对象的equals()方法比较返回true,两个对象的hashCode值也相等），这就有可能导致HashSet中包含两个相同的对象。
+
+//todo
 
 
 
