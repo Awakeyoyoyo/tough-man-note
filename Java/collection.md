@@ -881,7 +881,129 @@ poll,remove：移除并返回队头，poll当队列为空是返回null，remove�
 
 注意：queue.offer在自动包装机制会自动的把random.nextInt转化程Integer，把char转化成Character
 
+#### (19)**Deque**
+
+Deque是Queue的子接口,我们知道Queue是一种队列形式,而Deque则是双向队列,它支持从两个端点方向检索和插入元素,因此Deque既可以支持LIFO形式也可以支持LIFO形式.Deque接口是一种比Stack和Vector更为丰富的抽象数据形式,因为它同时实现了以上两者.
+
+添加功能
+
+void push(E) 向队列头部插入一个元素,失败时抛出异常
+
+void addFirst(E) 向队列头部插入一个元素,失败时抛出异常
+
+void addLast(E) 向队列尾部插入一个元素,失败时抛出异常
+
+boolean offerFirst(E) 向队列头部加入一个元素,失败时返回false
+
+boolean offerLast(E) 向队列尾部加入一个元素,失败时返回false
+
+获取功能
+
+E getFirst() 获取队列头部元素,队列为空时抛出异常
+
+E getLast() 获取队列尾部元素,队列为空时抛出异常
+
+E peekFirst() 获取队列头部元素,队列为空时返回null
+
+E peekLast() 获取队列尾部元素,队列为空时返回null
+
+删除功能
+
+boolean removeFirstOccurrence(Object) 删除第一次出现的指定元素,不存在时返回false
+
+boolean removeLastOccurrence(Object) 删除最后一次出现的指定元素,不存在时返回false
+
+弹出功能
+
+E pop() 弹出队列头部元素,队列为空时抛出异常
+
+E removeFirst() 弹出队列头部元素,队列为空时抛出异常
+
+E removeLast() 弹出队列尾部元素,队列为空时抛出异常
+
+E pollFirst() 弹出队列头部元素,队列为空时返回null
+
+E pollLast() 弹出队列尾部元素,队列为空时返回null
+
+迭代器
+
+Iterator<E> descendingIterator() 返回队列反向迭代器
+
  
+
+同Queue一样,Deque的实现也可以划分成通用实现和并发实现.
+
+　　通用实现主要有两个实现类ArrayDeque和LinkedList.
+
+　　ArrayDeque是个可变数组,它是在Java 6之后新添加的,而LinkedList是一种链表结构的list,LinkedList要比ArrayDeque更加灵活,因为它也实现了List接口的所有操作,并且可以插入null元素,这在ArrayDeque中是不允许的.
+
+　　从效率来看,ArrayDeque要比LinkedList在两端增删元素上更为高效,因为没有在节点创建删除上的开销.最适合使用LinkedList的情况是迭代队列时删除当前迭代的元素.此外LinkedList可能是在遍历元素时最差的数据结构,并且也LinkedList占用更多的内存,因为LinkedList是通过链表连接其整个队列,它的元素在内存中是随机分布的,需要通过每个节点包含的前后节点的内存地址去访问前后元素.
+
+　　总体ArrayDeque要比LinkedList更优越,在大队列的测试上有3倍与LinkedList的性能,最好的是给ArrayDeque一个较大的初始化大小,以避免底层数组扩容时数据拷贝的开销.
+
+　　LinkedBlockingDeque是Deque的并发实现,在队列为空的时候,它的takeFirst,takeLast会阻塞等待队列处于可用状态
+
+## **(20)Stack**
+
+Stack继承自Vector，实现一个后进先出的堆栈。Stack提供5个额外的方法使得 Vector得以被当作堆栈使用。基本的push和pop方法，还有peek方法得到栈顶的元素，empty方法测试堆栈是否为空，search方法检测一个元素在堆栈中的位置。Stack刚创建后是空栈。
+
+ 
+
+栈，是指“LIFO”先进后出的集合容器，最后一个压入的元素是第一个出来的，就好比我们洗碗一样（或者叠罗汉）第一个摆放的碗放在最下面，自然是最后一个拿出来的。Stack是由LinkedList实现的，作为Stack的实现，下面是《java编程思想》给出基本的Stack实现：
+
+peek和pop是返回T类型的对象。peek方法提供栈顶元素，但不删除栈顶，而pop是返回并删除栈顶元素;
+
+##  
+
+## **(20)ArrayDeque**
+
+ArrayDeque类是双端队列的实现类，类的继承结构如下面，继承自AbastractCollection（该类实习了部分集合通用的方法，其实现了Collection接口），其实现的接口Deque接口中定义了双端队列的主要的方法，比如从头删除，从尾部删除，获取头数据，获取尾部数据等等。
+
+public class ArrayDeque<E> extends AbstractCollection<E>              implements Deque<E>, Cloneable, Serializable
+
+ 
+
+ArrayDeque基本特征
+
+就其实现而言，ArrayDeque采用了循环数组的方式来完成双端队列的功能。 
+
+\1. 无限的扩展，自动扩展队列大小的。（当然在不会内存溢出的情况下。） 
+
+\2. 非线程安全的，不支持并发访问和修改。 
+
+\3. 支持fast-fail. 
+
+\4. 作为栈使用的话比比栈要快. 
+
+\5. 当队列使用比linklist要快。 
+
+\6. null元素被禁止使用。
+
+ 
+
+最小初始化容量限制8(必须是2的幂次)
+
+ 
+
+扩容:之所以说该ArrayDeque容量无限制，是因为只要检测到head==tail的时候，就直接调用doubleCapacity方法进行扩容。
+
+ 
+
+删除元素:删除元素的基本思路为确定那一侧的数据少，少的一侧移动元素位置，这样效率相对于不比较更高些，然后，判断head是跨越最大值还是为跨越最大值，继而可以分两种不同的情况进行拷贝。但是该方法比较慢，因为存在数组的拷贝。
+
+ 
+
+获取并删除元素:这里在举个简单点的例子，中间判断是不是null，可以看出该队列不支持null,通过把其值设为null就算是将其删除了。然后head向递增的方向退一位即可。 
+
+ 
+
+ArrayDeque和LinkedList是Deque的两个通用实现
+
+ArrayDeque不是线程安全的。 
+
+ArrayDeque不可以存取null元素，因为系统根据某个位置是否为null来判断元素的存在。 
+
+当作为栈使用时，性能比Stack好；当作为队列使用时，性能比LinkedList好。 
 
  
 
