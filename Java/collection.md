@@ -567,6 +567,16 @@ HashMap最多只允许一条记录的键为Null；允许多条记录的值为 Nu
 
 HashMap不支持线程的同步（任一时刻可以有多个线程同时写HashMap，即线程非安全），可能会导致数据的不一致。如果需要同步，可以用 Collections的synchronizedMap() 方法使HashMap具有同步的能力，或者使用ConcurrentHashMap。
 
+**SynchronizedMap和ConcurrentHashMap 区别**
+
+Collections.synchronizedMap()和Hashtable一样，实现上在调用map所有方法时，都对整个map进行同步，而ConcurrentHashMap的实现却更加精细，它对map中的所有桶加了锁。所以，只要要有一个线程访问map，其他线程就无法进入map，而如果一个线程在访问ConcurrentHashMap某个桶时，其他线程，仍然可以对map执行某些操作。这样，ConcurrentHashMap在性能以及安全性方面，明显比Collections.synchronizedMap()更加有优势。同时，同步操作精确控制到桶，所以，即使在遍历map时，其他线程试图对map进行数据修改，也不会抛出ConcurrentModificationException。
+
+ConcurrentHashMap从类的命名就能看出，它必然是个HashMap。而Collections.synchronizedMap()可以接收任意Map实例，实现Map的同步
+
+ 
+
+线程安全，并且锁分离。ConcurrentHashMap内部使用段(Segment)来表示这些不同的部分，每个段其实就是一个小的hashtable，它们有自己的锁。只要多个修改操作发生在不同的段上，它们就可以并发进行。 
+
 Hashtable与 HashMap类似。不同的是：它不允许记录的键或者值为空；它支持线程的同步（任一时刻只有一个线程能写Hashtable，即线程安全），因此也导致了 Hashtable 在写入时会比较慢。
 
 HashMap里面存入的值在取出的时候是随机的，它根据键的HashCode来存储数据，根据键可以直接获取它的值，具有很快的访问速度。在Map 中插入、删除和定位元素，HashMap 是最好的选择。
