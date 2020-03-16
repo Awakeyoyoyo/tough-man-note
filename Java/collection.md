@@ -1261,3 +1261,72 @@ ListIterator有add()方法，可以向list集合中添加数据
 　　2. 方法名得到了改进，Enumeration的方法名称都比较长。
 
 迭代器的好处：屏蔽了集合之间的不同，可以使用相同的方式取出
+
+
+
+
+
+
+
+## 自我总结
+
+#### hashMap：
+
+Jdk1.8的实现：
+
+```java
+
+    static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; 
+
+    static final int MAXIMUM_CAPACITY = 1 << 30;
+
+    static final float DEFAULT_LOAD_FACTOR = 0.75f;
+
+    static final int TREEIFY_THRESHOLD = 8;
+
+    static final int UNTREEIFY_THRESHOLD = 6;
+     
+    static final int MIN_TREEIFY_CAPACITY = 64;
+		
+		transient Node<K,V>[] table;
+
+    transient Set<Map.Entry<K,V>> entrySet;
+
+    transient int size;
+
+    transient int modCount;
+
+    int threshold;
+
+```
+
+
+
+- DEFAULT_INITIAL_CAPACITY:桶的初始化大小默认16 (必须为2的次方数)
+
+- MAXIMUM_CAPACITY ：桶最大值(2的一次幂至2的30次幂之间)
+
+- DEFAULT_LOAD_FACTOR:默认的负载因子（0.75)
+
+- TREEIFY_THRESHOLD:用于判断是否需要将链表转换为红黑树的阈值。默认为8
+
+- UNTREEIFY_THRESHOLD：用于判断是否需要将红黑树转换为链表的阈值。默认为6
+
+- MIN_TREEIFY_CAPACITY：在转变成红黑树之前，还会有一次判断，只有键值对数量大于 64 才会发生转换。这是为了避免在哈希表建立初期，多个键值对恰好被放入了同一个链表中而导致不必要的转化(例子：即如果只有一个桶中有九个键值对大于8个，则会触发是否转化为红黑树，此时还需要判断总键值对是否大于64，否则不会对全部桶中的链表转化为红黑树，只是对其进行扩容)
+
+  即链表长度大于8而且整个map中的键值对大于等于64
+
+- table：真正存放数据的数组。其实就是Entry<k,v>
+
+- size:存放键值对数量的大小。
+
+- entrySet:保存缓存的entrySet（）。 用于keySet（）和values（）。
+
+- threshold:桶大小，可在初始化时显式指定。
+
+- loadFactor:负载因子，可在初始化时显式指定
+
+#### ConcurrentHashMap：
+
+
+
