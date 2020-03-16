@@ -965,7 +965,7 @@ public class ArrayDeque<E> extends AbstractCollection<E>              implements
 
 ArrayDeque基本特征
 
-就其实现而言，ArrayDeque采用了循环数组的方式来完成双端队列的功能。 
+就其实现而言，ArrayDeque采用了**循环数组**的方式来完成双端队列的功能。 
 
 \1. 无限的扩展，自动扩展队列大小的。（当然在不会内存溢出的情况下。） 
 
@@ -1004,6 +1004,130 @@ ArrayDeque不是线程安全的。
 ArrayDeque不可以存取null元素，因为系统根据某个位置是否为null来判断元素的存在。 
 
 当作为栈使用时，性能比Stack好；当作为队列使用时，性能比LinkedList好。 
+
+ **(22)PriorityQueue**
+
+我们知道队列是遵循先进先出（First-In-First-Out）模式的，但有些时候需要在队列中基于优先级处理对象。举个例子，比方说我们有一个每日交易时段生成股票报告的应用程序，需要处理大量数据并且花费很多处理时间。客户向这个应用程序发送请求时，实际上就进入了队列。我们需要首先处理优先客户再处理普通用户。在这种情况下，Java的PriorityQueue(优先队列)会很有帮助。
+
+ 
+
+PriorityQueue类在Java1.5中引入并作为 Java Collections Framework 的一部分。PriorityQueue是基于优先堆的一个无界队列，这个优先队列中的元素可以默认自然排序或者通过提供的Comparator（比较器）在队列实例化的时排序。
+
+优先队列不允许空值，而且不支持non-comparable（不可比较）的对象，比如用户自定义的类。优先队列要求使用Java Comparable和Comparator接口给对象排序，并且在排序时会按照优先级处理其中的元素。
+
+优先队列的头是基于自然排序或者[Comparator](http://www.journaldev.com/780/java-comparable-and-comparator-example-to-sort-objects)排序的最小元素。如果有多个对象拥有同样的排序，那么就可能随机地取其中任意一个。当我们获取队列时，返回队列的头对象。
+
+优先队列的大小是不受限制的，但在创建时可以指定初始大小。当我们向优先队列增加元素的时候，队列大小会自动增加。
+
+PriorityQueue是非线程安全的，所以Java提供了PriorityBlockingQueue（实现BlockingQueue接口）用于Java多线程环境。
+
+由于知道PriorityQueue是基于Heap的，当新的元素存储时，会调用siftUpUsingComparator方法
+
+ 
+
+ 
+
+PriorityQueue的逻辑结构是一棵完全二叉树，存储结构其实是一个数组。逻辑结构层次遍历的结果刚好是一个数组。
+
+PriorityQueue优先队列,它逻辑上使用堆结构（完全二叉树）实现，物理上使用动态数组实现，并非像TreeMap一样完全有序，但是如果按照指定方式出队，结果可以是有序的。
+
+这里的堆是一种数据结构而非计算机内存中的堆栈。堆结构在逻辑上是完全二叉树，物理存储上是数组。
+
+完全二叉树并不是堆结构，堆结构是不完全有序的完全二叉树。
+
+ 
+
+## **(23)BlockingQueue**
+
+Java中Queue的最重要的应用大概就是其子类BlockingQueue了。
+
+考虑到生产者消费者模型，我们有多个生产者和多个消费者，生产者不断提供资源给消费者，但如果它们的生产/消费速度不匹配或者不稳定，则会造成大量的生产者闲置/消费者闲置。此时，我们需要使用一个缓冲区来存储资源，即生产者将资源置于缓冲区，而消费者不断地从缓冲区中取用资源，从而减少了闲置和阻塞。
+
+BlockingQueue，阻塞队列，即可视之为一个缓冲区应用于多线程编程之中。当队列为空时，它会阻塞所有消费者线程，而当队列为满时，它会阻塞所有生产者线程。
+
+在queue的基础上，BlockingQueue又添加了以下方法：
+
+ put：队列末尾添加一个元素，若队列已满阻塞。
+
+ take：移除并返回队列头部元素，若队列已空阻塞。
+
+ drainTo:一次性获取所有可用对象，可以用参数指定获取的个数，该操作是原子操作，不需要针对每个元素的获取加锁。
+
+ 
+
+ 
+
+## **(24) ArrayBlockingQueue**
+
+由一个定长数组和两个标识首尾的整型index标识组成，生产者放入数据和消费者取出数据对于ArrayBlockingQueue而言使用了同一个锁（一个私有的ReentrantLock），因而无法实现真正的并行。可以在初始化时除长度参数以外，附加一个boolean类型的变量，用于给其私有的ReentrantLock进行初始化（初始化是否为公平锁，默认为false）。
+
+ 
+
+## **(25) LinkedBlockingQueue**
+
+LinkedBlockingQueue的最大特点是，若没有指定最大容量，其可以视为无界队列（有默认最大容量限制,往往系统资源耗尽也无法达到）。即，不对生产者的行为加以限制，只在队列为空的时候限制消费者的行为。LinkedBlockingQueue采用了读写分离的两个ReentrantLock去控制put和take，因而有了更好的性能（类似读写锁提供读写场景下更好的性能），如下：
+
+  /** Lock held by take, poll, etc */   private final ReentrantLock takeLock = new ReentrantLock();   /** Wait queue for waiting takes */   private final Condition notEmpty = takeLock.newCondition();   /** Lock held by put, offer, etc */   private final ReentrantLock putLock = new ReentrantLock();   /** Wait queue for waiting puts */   private final Condition notFull = putLock.newCondition();
+
+ArrayBlockingQueue和LinkedBlockingQueue是最常用的两种阻塞队列。
+
+ 
+
+## **(26) PriorityBlockingQueue**
+
+PriorityBlockingQueue是对PriorityQueue的包装，因而也是一个优先队列。其优先级默认是直接比较，大者先出队，也可以从构造器传入自定义的Comparator。由于PriorityQueue从实现上是一个无界队列，PriorityBlockingQueue同样是一个无界队列，对生产者不做限制。
+
+ 
+
+## **(27) DelayQueue**
+
+DelayQueue是在PriorityBlockingQueue的基础上包装产生的，它用于存放Delayed对象，该队列的头部是延迟期满后保存时间最长的Delayed元素（即，以时间为优先级利用PriorityBlockingQueue），当没有元素延迟期满时，对其进行poll操作将会返回Null。take操作会阻塞。
+
+ 
+
+## **(28) SynchronousQueue**
+
+SynchronousQueue十分特殊，它没有容量——换言之，它是一个长度为0的BlockingQueue，生产者和消费者进行的是无中介的直接交易，当生产者/消费者没有找到合适的目标时，即会发生阻塞。但由于减少了环节，其整体性能在一些系统中可能更加适合。该方法同样支持在构造时确定为公平/默认的非公平模式，如果是非公平模式，有可能会导致某些生产者/消费者饥饿。
+
+ 
+
+## **(29)WeakHashMap**
+
+WeakHashMap是一种改进的HashMap，它对key实行“弱引用”，如果一个key不再被外部所引用，那么该key可以被GC回收。
+
+ 
+
+## **(30)EnumSet类**
+
+EnumSet是一个专门为枚举设计的集合类，EnumSet中的所有元素都必须是指定枚举类型的枚举值，该枚举类型的创建Enumset时显示会隐式的指定。Enumset的集合元素也是有序的，EnumSet以枚举值在Enum类内定义的顺序来决定集合元素的顺序。
+
+#### (32)使用java 8 新增的Stream操作集合
+
+Java8新增了Stream、IntStream、LongStream、DoubleStream等流式API，这些API代表了多个支持串行和并行聚集操作的元素，其中Stream是一个通用的流接口，而IntStream、LongStream、DoubleStream则代表了类型为int，long，double的流。
+
+   独立使用Stream的步骤如下:
+
+  1、使用Stream或XxxStream的builder()类方法创建该Stream对应的Builder。
+
+   2、重复调用Builder的add()方法向该流中的添加多个元素
+
+   3、调用Builder的build()方法获取对应的Stream
+
+   4、调用Stream的聚集方法。
+
+ 
+
+在Stream中方法分为两类中间方法和末端方法
+
+中间方法：中间操作允许流保持打开状态,并允许直接调用后续方法。上面程序中的map()方法就是中间方法。
+
+末端方法：末端方法是对流的最终操作。当对某个Stream执行末端方法后，该流将会被"消耗"且不再可用。上面程序中的sum()、count()、average()等方法都是末端方法。
+
+除此之外，关于流的方法还有如下特征：
+
+有状态的方法：这种方法会给你流增加一些新的属性，比如元素的唯一性、元素的最大数量、保证元素的排序的方式被处理等。有状态的方法往往需要更大的性能开销
+
+短路方法:短路方法可以尽早结束对流的操作，不必检查所有的元素。
 
  
 
