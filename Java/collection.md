@@ -1584,7 +1584,9 @@ final Node<K,V>[] resize() {
                         Node<K,V> next;
                         do {
                             next = e.next;
+                          //当前是链表, 通过(e.hash & oldCap) == 0来判断是否需要移位; 如果为真则在原位不动. 
                             if ((e.hash & oldCap) == 0) {
+                              //尾插法 一直尾部插元素
                                 if (loTail == null)
                                     loHead = e;
                                 else
@@ -1592,6 +1594,7 @@ final Node<K,V>[] resize() {
                                 loTail = e;
                             }
                             else {
+                              //尾插法 一直尾部插元素
                                 if (hiTail == null)
                                     hiHead = e;
                                 else
@@ -1600,10 +1603,12 @@ final Node<K,V>[] resize() {
                             }
                         } while ((e = next) != null);
                         if (loTail != null) {
+                          //即无需移动部分
                             loTail.next = null;
                             newTab[j] = loHead;
                         }
                         if (hiTail != null) {
+                          // 需要移动的部分，到当前hash槽位 + oldCap的位置;
                             hiTail.next = null;
                             newTab[j + oldCap] = hiHead;
                         }
