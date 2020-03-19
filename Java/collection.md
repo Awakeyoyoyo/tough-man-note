@@ -1723,12 +1723,12 @@ final void treeify(Node<K,V>[] tab) {
 static final int hash(Object key) {   //jdk1.8 & jdk1.7
      int h;
      // h = key.hashCode() 为第一步 取hashCode值
-     // h ^ (h >>> 16)  为第二步 高位参与运算  h右移16位
+     // h ^ (h >>> 16)  为第二步 高位参与异或运算  h右移16位
      return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
 }
 //方法二：
 static int indexFor(int h, int length) {  //jdk1.7的源码，jdk1.8没有这个方法，但是实现原理一样的,在方法体中运用
-     return h & (length-1);  //第三步 取模运算
+     return h & (length-1);  //第三步 取与运算
 }
 //即hashCode()的低16位与高16位右移16位相异或。
 ```
@@ -1762,7 +1762,7 @@ static int indexFor(int h, int length) {
 
 **例如1：为了方便验证，假设length为8。HashMap的默认初始容量为16**
 
-length = 8;  （length-1） = 7；转换二进制为111；
+length = 8;  （length-1） = 7；转换二进制为0000 0111；
 
 假设一个key的 hashcode = 78897121 转换二进制：100101100111101111111100001，与（length-1）& 运算如下
 
@@ -1786,7 +1786,7 @@ length = 8;  （length-1） = 7；转换二进制为111；
 
 **当length=2的N次方， 下标运算结果取决于哈希值的低N位**
 
-因为&和|都会使得结果偏向0或者1 ,并不是均匀的概念,所以用^。
+
 
 #### hashMap：
 
@@ -1807,6 +1807,8 @@ HashMap中的每个键值对，通过对key的哈希值与table-1(即桶的数�
 精力有限。。。留下几个问题后期再解决：
 
 #### hashmap为什么线程不安全？
+
+
 
 ####  hashmap为什么数组长度一定是2的次方？
 
