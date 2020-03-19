@@ -12,15 +12,12 @@ hashmap采取数组+链表的数据结构，在遇到哈希冲突的时候采用
 
 #### 2.hashmap为什么线程不安全？
 
-
+- 1.7的hashmap扩容的时候都是采用头插入的方法，在扩容的时候，resize会使同一桶的数据链表头尾倒置，而在多线程下这会导致会形成死循环;
+- 1.8的hashmap虽然改良了resize方法，修改了插入的方法改为了尾插入的方法，不会改变数据的存储顺序，解决了死循环的问题，但仍没有解决丢数据的问题。多个线程同时putval就可能会出现数据丢失的问题。扩容后的元素下标不用重新计算，只有哈希值跟原数组长度进行与运算，不为0就需要在原来的下标上加上原数组的长度。
 
 ####  3.hashmap为什么数组长度一定是2的次方？
 
 #### 
-
-#### 4.HashMap是否线程安全？
-
-不安全  hashtable安全
 
 #### **5.如果想使用线程安全的HashMap该如何做？**
 
@@ -34,7 +31,7 @@ Map map = Collections.synchronizedMap(new HashMap());
 
 HashTable主要支持同步和但不允许null作为key和value，任一时刻只有一个线程能写Hashtable，即线程安全），因此也导致了 Hashtable 在写入时会比较慢。
 
-#### 6.jdk1.7与1.8中的hashmap的扩容方法有何不同，并且做了什么改良
+#### 6.jdk1.7与1.8中的hashmap的扩容方法有何不同，并且做了什么改良？
 
 jdk1.8haspmap的resize函数分析
 
@@ -123,9 +120,11 @@ jdk1.8haspmap的resize函数分析
 
 ##### 1）1.8不再为元素一一重新计算下标，而是分成两类，一类不需要计算直接用原来的下标，一类为原下标+原tables数组的长度
 
-##### 2）
+##### 2）1.8对于1.7的节点重新定位代码进行了优化
 
-### 最精髓之处：为何 e.hash & oldCap == 0为什么可以判断当前节点是否需要移位, 而不是再次计算hash;
+### 下面对不同之处进行一一的分析：
+
+#####（1）为何 e.hash & oldCap == 0为什么可以判断当前节点是否需要移位, 而不是再次计算hash;
 
 记得这个计算桶下表运算吗
 
@@ -157,4 +156,61 @@ newTab[j + oldCap] = hiHead;
 
 那为什么j + oldCap就是他的当前下标呢？
 
-原因很简单：j代表的是为扩容前的下表，而上述既然表现出它比为扩容多一位，哪一位就恰恰好等于oldcap长度16，（这也是为什么hashmap扩容是扩两倍，都是环环相扣的）
+原因很简单：j代表的是为扩容前的下表，而上述既然表现出它比为扩容多一位，那一位就恰恰好等于oldcap长度，（这也是为什么hashmap扩容是扩两倍，都是环环相扣的）。
+
+#### （2）jdk1.8对于1.7的节点重新定位代码进行了优化
+
+参考于：https://blog.csdn.net/weixin_39667787/article/details/86678215
+
+1.7重新定位的代码
+
+```java
+    void transfer(Entry[] newTable, boolean rehash) {
+        int newCapacity = newTable.length;
+        for (Entry<K,V> e : table) {
+            while(null != e) {
+              //导致闭合的重要原因，先获取了next，另一个线程如果先resize完，那么gg公司了，会导致闭合
+                Entry<K,V> next = e.next;
+                if (rehash) {
+                    e.hash = null == e.key ? 0 : hash(e.key);
+                }
+              //重新利用hash计算下标
+                int i = indexFor(e.hash, newCapacity);
+              //头插法
+                e.next = newTable[i];
+                newTable[i] = e;
+                e = next;
+            }
+        }
+    }
+```
+
+上面的代码是JAVA7中对于HashMap节点重新定位的代码, 我们都知道HashMap是非线程安全的, 最主要的原因是他在resize的时候会形成环形链表, 然后导致get时死循环;
+
+![hash](../images/hash.png)
+
+这时候有两个线程需要插入第四个节点, 这个时候HashMap就需要做resize了,我们先假设线程已经resize完成, 而线程二必须等线程一完成再resize:
+
+![hash](../images/hash2.png)
+
+经过线程一resize后, 可以发现a b节点的顺序被反转了, 这时候我们来看线程二:
+
+![hash](../images/hash3.png)
+
+1 线程二的开始点是只获取到A节点, 还没获取他的next;
+.2 这时候线程一resize完成, a.next = null; b.next = a; newTable[i] = b;
+.3 线程二开始执行, 获取A节点的next节点, a.next = null;
+.4 接着执行 a.next = newTable[i]; 因为这时候newTable[i]已经是B节点了, 并且b.next = a; 那么我们把newTablei赋值给a.next后, 就会线程a-b-a这样的环形链表了, 也就是上图的结果;
+.5 因为第三步的a.next已经是null, 所以C节点就丢失了;
+.6 那这时候来查位于1节点的数据D(其实不存在), 因为 d != a, 会接着查a.next, 也就是b; 但是b != d, 所以接着查b.next, 但是b.next还是a; 这就悲剧了, 在循环里出不去了;
+
+这就是JDK7resize最大的缺陷, resize会使同一桶的数据链表头尾倒置，而在多线程下这会导致会形成死循环;
+那么JDK8做了优化以后, 死循环的问题解除了吗?
+![hash](../images/hash4.png)
+
+通过上图我们发现JDK8的resize是让节点的顺序发生改变的, 也就是没有倒排问题了;也是假设有两个线程, 线程一已执行完成, 这时候线程二来执行:
+.1 因为顺序没变, 所以node1.next还是node2, 只是node2.next从node3变成了null;
+.2 而且JDK8是在遍历完所有节点之后, 才对形成的两个链表进行关联table的, 所以不会像JAVA7一般形成A-B-A问题了;
+.3 但是如果并发了, JAVA的HashMap还是没有解决丢数据的问题, 但是不和JAVA7一般有数据倒排以及死循环的问题了;
+
+HashMap设计时就是没有保证线程安全的, 所以在多线程环境请使用ConcurrentHashMap;
