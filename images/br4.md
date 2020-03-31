@@ -432,10 +432,128 @@ public class SerializePersonTest {
 
 运行结果
 
-![serialize](../images/seralize.jpg)
+![serialize](../images/serialize.jpg)
 
 **serialVersionUID的作用**
 
 serialVersionUID适用于Java的序列化机制。简单来说，Java的序列化机制是通过判断类的serialVersionUID来验证版本一致性的。在进行反序列化时，JVM会把传来的字节流中的serialVersionUID与本地相应实体类的serialVersionUID进行比较，如果相同就认为是一致的，可以进行反序列化，否则就会出现序列化版本不一致的异常，即是InvalidCastException。
 
 **具体的序列化过程是这样的**：序列化操作的时候系统会把当前类的serialVersionUID写入到序列化文件中，当反序列化时系统会去检测文件中的serialVersionUID，判断它是否与当前类的serialVersionUID一致，如果一致就说明序列化类的版本与当前类版本是一样的，可以反序列化成功，否则失败。
+
+serialVersionUID有两种显示的生成方式：     
+一是默认的1L，比如：private static final long serialVersionUID = 1L;     
+二是根据类名、接口名、成员方法及属性等来生成一个64位的哈希字段，比如：     
+private static final long  serialVersionUID = xxxxL;
+
+当实现java.io.Serializable接口的类没有显式地定义一个serialVersionUID变量时候，Java序列化机制会根据编译的Class自动生成一个serialVersionUID作序列化版本比较用，这种情况下，如果Class文件(类名，方法明等)没有发生变化(增加空格，换行，增加注释等等)，就算再编译多次，serialVersionUID也不会变化的
+
+## 静态变量序列化
+
+修改代码
+
+```java
+package com.awakeyo.serializable;
+
+import java.io.Serializable;
+
+/**
+ * @author awakeyoyoyo
+ * @className Person
+ * @description TODO
+ * @date 2020-03-31 13:53
+ */
+public class Person implements Serializable {
+    private static final long serialVersionUID=13316311153L;
+    private int age;
+    private String name;
+    private String sex;
+    public static int staticVar = 10;
+
+    @Override
+    public String toString() {
+        return "Person{" +
+                "age=" + age +
+                ", name='" + name + '\'' +
+                ", sex='" + sex + '\'' +
+                '}';
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getSex() {
+        return sex;
+    }
+
+    public void setSex(String sex) {
+        this.sex = sex;
+    }
+}
+
+```
+
+```java
+package com.awakeyo.serializable;
+
+import com.sun.org.apache.bcel.internal.generic.NEW;
+
+import java.io.*;
+
+/**
+ * @author awakeyoyoyo
+ * @className SerializePersonTest
+ * @description TODO
+ * @date 2020-03-31 13:57
+ */
+public class SerializePersonTest {
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
+        Person person=new Person();
+        person.setName("lqhao");
+        person.setAge(21);
+        person.setSex("男");
+        ObjectOutputStream oo=new ObjectOutputStream(new FileOutputStream(new File("./person.txt")));
+        oo.writeObject(person);
+        System.out.println("Person对象序列化成果");
+        oo.close();
+        System.out.println("--------------------");
+        Person.staticVar=999;
+        ObjectInputStream ois=new ObjectInputStream(new FileInputStream("./person.txt"));
+        Person person1=(Person) ois.readObject();
+        System.out.println("Persion反序列化成果");
+        System.out.println(person1.toString());
+        System.out.println("staticvar="+person1.staticVar);
+        ois.close();
+    }
+
+}
+```
+
+最终结果
+
+![serialize2](../images/serialize2.jpg)
+
+最后的输出是 999，打印的 staticVar 是从读取的对象里获得的，应该是保存时的状态才对。之所以打印 999的原因在于序列化时，并不保存静态变量，这其实比较容易理解，序列化保存的是对象的状态，静态变量属于类的状态，**因此 序列化并不保存静态变量。**
+
+## 父类的序列化与 Transient 关键字
+
+##### 父类的序列化
+
+要想将父类对象也序列化，就需要让父类也实现Serializable 接口。如果父类不实现的话的，就 需要有默认的无参的构造函数。在父类没有实现 Serializable 接口时，虚拟机是不会序列化父对象的，而一个 Java 对象的构造必须先有父对象，才有子对象，反序列化也不例外。所以反序列化时，为了构造父对象，只能调用父类的无参构造函数作为默认的父对象。因此当我们取父对象的变量值时，它的值是调用父类无参构造函数后的值。如果你考虑到这种序列化的情况，在父类无参构造函数中对变量进行初始化，否则的话，父类变量值都是默认声明的值，如 int 型的默认是 0，string 型的默认是 null。
+
+##### Transient 关键字
+
+作用是控制变量的序列化，在变量声明前加上该关键字，可以阻止该变量被序列化到文件中，在被反序列化后，transient 变量的值被设为初始值，如 int 型的是 0，对象型的是 null。
+
