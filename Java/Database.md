@@ -268,3 +268,412 @@ balabala了这么多，相信你对红黑树有一定印象了，那么现在来
 
 ok，插入位置已经找到，把插入结点放到正确的位置就可以啦，但插入结点是应该是什么颜色呢？答案是**红色**。理由很简单，红色在父结点（如果存在）为黑色结点时，红黑树的黑色平衡没被破坏，不需要做自平衡操作。但如果插入结点是黑色，那么插入位置所在的子树黑色结点总是多1，必须做自平衡。
 
+
+
+## 基本的排序算法
+
+### 1.冒泡排序
+
+- 基本思想: 冒泡排序，类似于水中冒泡，较大的数沉下去，**较小的数慢慢冒起来**，假设从小到大，即为较大的数慢慢往后排，较小的数慢慢往前排。
+
+**算法的描述：**
+
+> 比较相邻的元素，然后如果左边大于右边则交换位置。（相当于每次循环都把最大的数一到数组后面）
+
+**复杂度：**
+
+> 时间复杂度：O(N²)   (两个嵌套循环)
+>
+> 空间复杂度：O(1)   
+
+**代码：**
+
+```java
+//1.冒泡排序
+    public static void bubbleSort(int[] a) {
+        int len = a.length;
+        int temp = 0;
+        for (int i = 0; i < len - 1; i++) {
+            for (int j = 0; j < len - i - 1; j++) {
+                if (a[j + 1] < a[j]) {
+                    temp = a[j + 1];
+                    a[j + 1] = a[j];
+                    a[j] = temp;
+                }
+            }
+        }
+    }
+```
+
+### 2.插入排序
+
+- 基本思想: 将数组的第一个数认为是有序数组，从后往前扫描该有序数组，把数组中其余n-1个数，根据数值的大小，插入到有序数组中，直至数组中的所有数有序排列为止。这样的话，n个元素需要进行n-1趟排序！！！
+
+**算法的描述：**
+
+> 每一次把数组中一个数与有序数组进行从后往前一一比较，遇到比有序数组中元素小然后插入。
+
+**复杂度：**
+
+> 时间复杂度：O(N²)   
+>
+> 空间复杂度：O(1)   
+
+**代码：**
+
+```java
+//4.插入排序
+    public static void insertionSort(int arr[]) {
+        //插入排序
+        for (int i = 1; i < arr.length; i++) {
+            //外层循环，从第二个开始比较
+            for (int j = i; j > 0; j--) {
+                //内存循环，与前面排好序的数据比较，如果后面的数据小于前面的则交换
+                if (arr[j] < arr[j - 1]) {
+                    int temp = arr[j - 1];
+                    arr[j - 1] = arr[j];
+                    arr[j] = temp;
+                } else {
+                    //如果不小于，说明插入完毕，退出内层循环
+                    break;
+                }
+            }
+        }
+    }
+```
+
+
+
+### 3.选择排序
+
+基本思想：选择排序，从头至尾扫描序列，找出最小的一个元素，和第一个元素交换，接着从剩下的元素中继续这种选择和交换方式，最终得到一个有序序列。
+
+**算法的描述：**
+
+> 每一次把数组中一个数与有序数组进行从后往前一一比较，遇到比有序数组中元素小然后插入。
+
+**复杂度：**
+
+> 时间复杂度：O(N²)   
+>
+> 空间复杂度：O(1)  
+
+**代码：**
+
+```java
+    public static void selectSort(int arr[]) {
+        for (int i = 0; i < arr.length; i++) {
+            //默认第一个是最小的。
+            int min = arr[i];
+            //记录最小的下标
+            int index = i;
+            //通过与后面的数据进行比较得出，最小值和下标
+            for (int j = i + 1; j < arr.length; j++) {
+                if (min > arr[j]) {
+                    min = arr[j];
+                    index = j;
+                }
+            }
+            //然后将最小值与本次循环的，开始值交换
+            int temp = arr[i];
+            arr[i] = min;
+            arr[index] = temp;
+            //说明：将i前面的数据看成一个排好的队列，i后面的看成一个无序队列。每次只需要找无需的最小值，做替换
+        }
+    }
+```
+
+
+
+### 4.快速排序
+
+- 基本思想：1、先从数组中取出一个数作为基准数 2、将比这个数大的放在它右边，小于或者等于这个数的放在左边 3、再对左右区间重复第二步，直到各个区间只有一个数字
+
+**算法的描述：**
+
+> 用到了分治的思想，以一个数为基准，把数组分为一边大、一边小，然后再分别对左、右两个数组进行相同操作，直到子数组为1。
+
+**例子：**
+
+由于该算法比较晦涩难懂，举例子来说明一下算法过程（先简单查阅下面代码再来一一对应例子的步骤比较好理解）。
+
+index： 0 1 2 3 4 5 6 7 8 9
+
+数组：   6 1 2 5 9 3 4 7 10 8
+
+step1）取6为基准值。然后从右寻找比6小的值 j=6,然后右往左找比6大的值 i=4
+
+   此时交换：数组转变成 6 1 2 5 **4** 3 **9** 10 8 i=4 j=6
+
+Step2) 继续以6位基准值，从j=6处向右寻找比6小的值，j=5，从i=4处向左找大于等于6的值i=5 此时i==j不进行元素交换，直接跳出循环将基准值与i坐标的值调转。
+
+此时数组转变为：3 1 2 5 4 6 9 10 8
+
+Step3)此时呢就把数组分为一边比6大 一边比6小了 随后分别对{3,1,2,5,4} {9,10,8}继续执行快排算法
+
+Step4)由于算法都是一样，我选择比较短的{9,10,8}来演示快排函数最后的收尾部分
+
+ 数组：9 10 8。取9为基准值，那么老套路 j=2    i=1 
+
+交换数组变为：9 8 10    j=2 i=1。老套路  j=1  i=1 由于i==j不交换 退出主循环
+
+则i与left的值交换 变为 9 8 10
+
+然后对 {9} {10}进行快排，此时数组中元素只有一个就退出了  
+
+到此为止排序就完成了。
+
+**复杂度：**
+
+>平均时间复杂度：O(nlogn)
+
+**代码：**
+
+```java
+//2.快排
+    public static void quickSort(int[] num, int left, int right) {
+        if (left >= right) {
+            return;
+        }
+        //设置最左边的元素为基准值
+        int key = num[left];
+        //数组中比key小的放在左边，比key大的放在右边，key值下标为i
+        int i = left;
+        int j = right;
+        while (i < j) {
+            //j向左移，直到遇到比key小的值
+            while (num[j] >= key && i < j) {
+                j--;
+            }
+            //i向右移，直到遇到比key大的值
+            while (num[i] <= key && i < j) {
+                i++;
+            }
+            //i和j指向的元素交换
+            if (i < j) {
+                int temp = num[i];
+                num[i] = num[j];
+                num[j] = temp;
+            }
+        }
+      	//i指向的元素与基准值进行交换
+        num[left] = num[i];
+        num[i] = key;
+        quickSort(num, left, i - 1);
+        quickSort(num, i + 1, right);
+    }
+```
+
+
+
+### 5.归并排序
+
+参考：https://www.cnblogs.com/chengxiao/p/6194356.html
+
+- 基本思想：与快速排序一样，归并排序也是基于分治法的。归并排序将待排序的元素序列分成两个长度相等的子序列，为每一个子序列排序，然后再将他们合并成一个子序列。合并两个子序列的过程也就是两路归并。
+
+**算法的描述：**
+
+> 用到了分治的思想，主要的难度集中在归并上，其实就是两个数组通过下标来进行比较，由于都是排好序的两个数组，所以比较的时候就有规律可循，文字解释挺难的，我从参考博客那里取了栗子图，结合代码看一下就基本了解了
+
+**复杂度：**
+
+> 时间复杂度：O( nlogn )
+> 与快排速度相同，但是比快排稳定，快排是平均时间复杂度为O(nlogn)
+>
+
+**例子：**
+
+**分而治之**
+
+![img](https://images2015.cnblogs.com/blog/1024555/201612/1024555-20161218163120151-452283750.png)
+
+**合并相邻有序子序列**
+
+![img](https://images2015.cnblogs.com/blog/1024555/201612/1024555-20161218194508761-468169540.png)
+
+![img](https://images2015.cnblogs.com/blog/1024555/201612/1024555-20161218194621308-588010220.png)
+
+**个人理解：**
+
+归并算法的主要难点集中在归并函数中，此函数需要将两个排好序或者单个元素的数组进行合并。从上方图片已经可以知道排好序的两个数组比较 只需要从两个数组的头开始比较，谁小谁就放入辅助数组之中，但左右其中一个数组越界之后，另一个数组必然会存在一个以上元素为放入辅助数组中，未放入代表着他已经比另外一个数组的所以元素都大了，而由于两个数组都是排好序了，所以此时将下标未越界的数组中所有元素有序的插入到辅助数组中即可。
+
+**代码：**
+
+```java
+//5.归并排序
+    //两路归并算法，两个排好序的子序列合并为一个子序列
+    public static void merge(int[] a, int left, int mid, int right) {
+        int[] tmp = new int[a.length];//辅助数组
+        int p1 = left, p2 = mid + 1, k = left;//p1、p2是检测指针，k是存放指针
+        while (p1 <= mid && p2 <= right) { //左右两个数组的下表界限
+            if (a[p1] <= a[p2]) //其实就是两个排好序的数组分别从最小数字开始比较，谁最小就放入辅助数组中
+                tmp[k++] = a[p1++];
+            else
+                tmp[k++] = a[p2++];
+        }
+
+        while (p1 <= mid) tmp[k++] = a[p1++];//如果第一个序列未检测完，直接将后面所有元素加到合并的序列中
+        while (p2 <= right) tmp[k++] = a[p2++];//同上
+
+        //复制回原素组
+        for (int i = left; i <= right; i++)
+            a[i] = tmp[i];
+    }
+    public static void mergeSort(int[] a, int start, int end) {
+        if (start < end) {//当子序列中只有一个元素时结束递归
+            int mid = (start + end) / 2;//划分子序列
+            mergeSort(a, start, mid);//对左侧子序列进行递归排序
+            mergeSort(a, mid + 1, end);//对右侧子序列进行递归排序
+            merge(a, start, mid, end);//合并
+        }
+    }
+```
+
+最终5个基本的排序算法的代码：
+
+```java
+package com.awakeyo.Sort;
+
+import java.util.Arrays;
+import java.util.Date;
+
+/**
+ * @author awakeyoyoyo
+ * @className Solution
+ * @description TODO
+ * @date 2020-03-31 22:44
+ */
+public class Solution {
+    //1.冒泡排序
+    public static void bubbleSort(int[] a) {
+        int len = a.length;
+        int temp = 0;
+        for (int i = 0; i < len - 1; i++) {
+            for (int j = 0; j < len - i - 1; j++) {
+                if (a[j + 1] < a[j]) {
+                    temp = a[j + 1];
+                    a[j + 1] = a[j];
+                    a[j] = temp;
+                }
+            }
+        }
+    }
+    //2.快排
+    public static void quickSort(int[] num, int left, int right) {
+        if (left >= right) {
+            return;
+        }
+        //设置最左边的元素为基准值
+        int key = num[left];
+        //数组中比key小的放在左边，比key大的放在右边，key值下标为i
+        int i = left;
+        int j = right;
+        while (i < j) {
+            //j向左移，直到遇到比key小的值
+            while (num[j] >= key && i < j) {
+                j--;
+            }
+            //i向右移，直到遇到比key大的值
+            while (num[i] <= key && i < j) {
+                i++;
+            }
+            //i和j指向的元素交换
+            if (i < j) {
+                int temp = num[i];
+                num[i] = num[j];
+                num[j] = temp;
+            }
+        }
+        num[left] = num[i];
+        num[i] = key;
+        quickSort(num, left, i - 1);
+        quickSort(num, i + 1, right);
+    }
+    //3.选择排序
+    public static void selectSort(int arr[]) {
+        for (int i = 0; i < arr.length; i++) {
+            //默认第一个是最小的。
+            int min = arr[i];
+            //记录最小的下标
+            int index = i;
+            //通过与后面的数据进行比较得出，最小值和下标
+            for (int j = i + 1; j < arr.length; j++) {
+                if (min > arr[j]) {
+                    min = arr[j];
+                    index = j;
+                }
+            }
+            //然后将最小值与本次循环的，开始值交换
+            int temp = arr[i];
+            arr[i] = min;
+            arr[index] = temp;
+            //说明：将i前面的数据看成一个排好的队列，i后面的看成一个无序队列。每次只需要找无需的最小值，做替换
+        }
+    }
+    //4.插入排序
+    public static void insertionSort(int arr[]) {
+        //插入排序
+        for (int i = 1; i < arr.length; i++) {
+            //外层循环，从第二个开始比较
+            for (int j = i; j > 0; j--) {
+                //内存循环，与前面排好序的数据比较，如果后面的数据小于前面的则交换
+                if (arr[j] < arr[j - 1]) {
+                    int temp = arr[j - 1];
+                    arr[j - 1] = arr[j];
+                    arr[j] = temp;
+                } else {
+                    //如果不小于，说明插入完毕，退出内层循环
+                    break;
+                }
+            }
+        }
+    }
+    //5.归并排序
+    //两路归并算法，两个排好序的子序列合并为一个子序列
+    public static void merge(int[] a, int left, int mid, int right) {
+        int[] tmp = new int[a.length];//辅助数组
+        int p1 = left, p2 = mid + 1, k = left;//p1、p2是检测指针，k是存放指针
+
+        while (p1 <= mid && p2 <= right) {
+            if (a[p1] <= a[p2])
+                tmp[k++] = a[p1++];
+            else
+                tmp[k++] = a[p2++];
+        }
+
+        while (p1 <= mid) tmp[k++] = a[p1++];//如果第一个序列未检测完，直接将后面所有元素加到合并的序列中
+        while (p2 <= right) tmp[k++] = a[p2++];//同上
+
+        //复制回原素组
+        for (int i = left; i <= right; i++)
+            a[i] = tmp[i];
+    }
+    public static void mergeSort(int[] a, int start, int end) {
+        if (start < end) {//当子序列中只有一个元素时结束递归
+            int mid = (start + end) / 2;//划分子序列
+            mergeSort(a, start, mid);//对左侧子序列进行递归排序
+            mergeSort(a, mid + 1, end);//对右侧子序列进行递归排序
+            merge(a, start, mid, end);//合并
+        }
+    }
+    //测试函数
+    public static void main(String[] args) {
+        int[] nums1 = {5, 2, 3, 1};
+        int[] nums2 = {5, 1, 1, 2, 0, 0};
+//        quickSort(nums1, 0, nums1.length-1);
+//        quickSort(nums2, 0, nums2.length-1);
+//        selectSort(nums1);
+//        selectSort(nums2);
+//        insertionSort(nums1);
+//        insertionSort(nums2);
+        mergeSort(nums1, 0, nums1.length - 1);
+        mergeSort(nums2, 0, nums1.length - 1);
+        Arrays.stream(nums1).forEach(System.out::print);
+        System.out.println("\n################");
+        Arrays.stream(nums2).forEach(System.out::print);
+    }
+}
+
+```
+
