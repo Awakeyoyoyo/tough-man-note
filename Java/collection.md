@@ -1813,11 +1813,226 @@ HashMap中的每个键值对，通过对key的哈希值与table-1(即桶的数�
 
 #### hashmap为什么线程不安全？
 
-
-
 ####  hashmap为什么数组长度一定是2的次方？
 
-#### ConcurrentHashMap：
+## ConcurrentHashMap
 
+1.8之前的concurrenthashmap采用的是分段式锁的策略。
 
+ConcurrentHashMap的主干是Segment数组，而Segment数组的主干是我们最熟悉的HashEntry<K,V>数组
 
+### 1.8之前concurrentHashMap
+
+先简单介绍一下各个变量的含义
+
+concurrencyLevel：并行度
+
+MAX_SEGMENTS：最大的并发数
+
+ssize：segments数组的长度
+
+sshift：2的sshift等于ssize
+
+cap：segments中hashentry的长度
+
+segmentShift：2的sshift次方等于ssize，segmentShift=32-sshift。若segments长度为16，segmentShift=32-4=28;若segments长度为32，segmentShift=32-5=27。而计算得出的hash值最大为32位，无符号右移segmentShift，则意味着只保留高几位（其余位是没用的），然后与段掩码segmentMask位运算来定位Segment。
+
+segmentMask：主要用于定位segment，段掩码，假如segments数组长度为16，则段掩码为16-1=15；segments长度为32，段掩码为32-1=31。这样得到的所有bit位都为1，可以更好地保证散列的均匀性
+
+#### ConcurrentHashMap构造函数：
+
+```java
+public ConcurrentHashMap(int initialCapacity,
+                               float loadFactor, int concurrencyLevel) {
+          if (!(loadFactor > 0) || initialCapacity < 0 || concurrencyLevel <= 0)
+              throw new IllegalArgumentException();
+          //MAX_SEGMENTS 为1<<16=65536，也就是最大并发数为65536
+          if (concurrencyLevel > MAX_SEGMENTS)
+              concurrencyLevel = MAX_SEGMENTS;
+          //2的sshif次方等于ssize，例:ssize=16,sshift=4;ssize=32,sshif=5
+         int sshift = 0;
+         //ssize 为segments数组长度，根据concurrentLevel计算得出
+         int ssize = 1;
+         while (ssize < concurrencyLevel) {
+             ++sshift;
+             ssize <<= 1;
+         }
+         //segmentShift和segmentMask这两个变量在定位segment时会用到
+         this.segmentShift = 32 - sshift;
+         this.segmentMask = ssize - 1;
+         if (initialCapacity > MAXIMUM_CAPACITY)
+             initialCapacity = MAXIMUM_CAPACITY;
+         //计算cap的大小，即Segment中HashEntry的数组长度，cap也一定为2的n次方.
+         int c = initialCapacity / ssize;
+         if (c * ssize < initialCapacity)
+             ++c;
+  			//min segment中hashentry的大小
+         int cap = MIN_SEGMENT_TABLE_CAPACITY;
+         while (cap < c)
+             cap <<= 1;
+         //创建segments数组并初始化第一个Segment，其余的Segment延迟初始化
+         Segment<K,V> s0 =
+             new Segment<K,V>(loadFactor, (int)(cap * loadFactor),
+                              (HashEntry<K,V>[])new HashEntry[cap]);
+         Segment<K,V>[] ss = (Segment<K,V>[])new Segment[ssize];
+         UNSAFE.putOrderedObject(ss, SBASE, s0); 
+         this.segments = ss;
+     }
+```
+
+#### put方法
+
+```java
+public V put(K key, V value) {
+        Segment<K,V> s;
+        //concurrentHashMap不允许key/value为空
+        if (value == null)
+            throw new NullPointerException();
+        //hash函数对key的hashCode重新散列，避免差劲的不合理的hashcode，保证散列均匀
+        int hash = hash(key);
+        //返回的hash值无符号右移segmentShift位与段掩码进行位运算，定位segment
+        int j = (hash >>> segmentShift) & segmentMask;
+        if ((s = (Segment<K,V>)UNSAFE.getObject          // nonvolatile; recheck
+             (segments, (j << SSHIFT) + SBASE)) == null) //  in ensureSegment
+            s = ensureSegment(j);
+        return s.put(key, hash, value, false);
+    }
+```
+
+put方法的主要逻辑：
+
+1.定位segement并且确保segment已经初始化了
+
+2.调用segement的put方法
+
+##### segement的put方法：
+
+```java
+final V put(K key, int hash, V value, boolean onlyIfAbsent) {
+  //调用tryLock()方法获取锁
+            HashEntry<K,V> node = tryLock() ? null :
+                scanAndLockForPut(key, hash, value);//tryLock不成功时会遍历定位到的HashEnry位置的链表（遍历主要是为了使CPU缓存链表），若找不到，则创建HashEntry。tryLock一定次数后（MAX_SCAN_RETRIES变量决定），则lock。若遍历过程中，由于其他线程的操作导致链表头结点变化，则需要重新遍历。
+            V oldValue;
+            try {
+                HashEntry<K,V>[] tab = table;
+                int index = (tab.length - 1) & hash;//定位HashEntry，可以看到，这个hash值在定位Segment时和在Segment中定位HashEntry都会用到，只不过定位Segment时只用到高几位。
+                HashEntry<K,V> first = entryAt(tab, index);
+                for (HashEntry<K,V> e = first;;) {
+                    if (e != null) {
+                        K k;
+                        if ((k = e.key) == key ||
+                            (e.hash == hash && key.equals(k))) {
+                            oldValue = e.value;
+                            if (!onlyIfAbsent) {
+                                e.value = value;
+                                ++modCount;
+                            }
+                            break;
+                        }
+                        e = e.next;
+                    }
+                    else {
+                        if (node != null)
+                            node.setNext(first);
+                        else
+                            node = new HashEntry<K,V>(hash, key, value, first);
+                        int c = count + 1;
+　　　　　　　　　　　　　　//若c超出阈值threshold，需要扩容并rehash。扩容后的容量是当前容量的2倍。
+                        if (c > threshold && tab.length < MAXIMUM_CAPACITY)
+                            rehash(node);
+                        else
+                            setEntryAt(tab, index, node);
+                        ++modCount;
+                        count = c;
+                        oldValue = null;
+                        break;
+                    }
+                }
+            } finally {
+                unlock();
+            }
+            return oldValue;
+        }
+```
+
+在segment的put方法中，首先调用的trylock() 尝试获取锁，如果获取失败就是有其他线程存在咯，则利用scanAndLockForPut()来自动获取锁
+
+#### scanAndLockForPut()
+
+```java
+private HashEntry<K,V> scanAndLockForPut(K key, int hash, V value) {
+    HashEntry<K,V> first = entryForHash(this, hash);
+    HashEntry<K,V> e = first;
+    HashEntry<K,V> node = null;
+    int retries = -1; // 迭代次数
+    while (!tryLock()) {
+    HashEntry<K,V> f; 
+    if (retries < 0) {
+        if (e == null) {
+        if (node == null) // speculatively create node
+            node = new HashEntry<K,V>(hash, key, value, null);
+        retries = 0;
+        }
+        else if (key.equals(e.key))
+        retries = 0;
+        else
+        e = e.next;
+    }
+        //超过迭代次数，阻塞
+    else if (++retries > MAX_SCAN_RETRIES) {
+        lock();
+        break;
+    }
+    else if ((retries & 1) == 0 &&
+         (f = entryForHash(this, hash)) != first) {
+        e = first = f; // re-traverse if entry changed
+        retries = -1;
+    }
+    }
+    return node;
+}
+
+```
+
+循环调用tryLock，多次获取，如果循环次数retries 次数大于事先设置定好的MAX_SCAN_RETRIES，就执行lock() 方法，此方法会阻塞等待，一直到成功拿到Segment锁为止。
+
+#### get方法
+
+```java
+public V get(Object key) {
+        Segment<K,V> s; 
+        HashEntry<K,V>[] tab;
+        int h = hash(key);
+        long u = (((h >>> segmentShift) & segmentMask) << SSHIFT) + SBASE;
+        //先定位Segment，再定位HashEntry
+        if ((s = (Segment<K,V>)UNSAFE.getObjectVolatile(segments, u)) != null &&
+            (tab = s.table) != null) {
+            for (HashEntry<K,V> e = (HashEntry<K,V>) UNSAFE.getObjectVolatile
+                     (tab, ((long)(((tab.length - 1) & h)) << TSHIFT) + TBASE);
+                 e != null; e = e.next) {
+                K k;
+                if ((k = e.key) == key || (e.hash == h && key.equals(k)))
+                    return e.value;
+            }
+        }
+        return null;
+    }
+```
+
+get方法就无需加锁了，因为涉及的共享变量都是用了volatile修饰，volatile可以保证内存可见性，即不同线程，其中一个线程修改后，另一个线程立刻可见。
+
+get方法之所以不需要加锁，原因比较简单，get为只读操作，不会改动map数据结构，所以在操作过程中，只需要保证涉及读取数据的属性为线程可见即可，也即使用volatile修饰。
+
+#### 关于concurrenthashmap的扩容问题
+
+ConcurrentHashMap的扩容跟HashMap有点不同， ConcurrentHashMap的Segment槽是固定的16个，不变的。
+
+而ConcurrentHashMap的扩容讲的是Segment中的HashEntry数组扩容。当HashEntry达到某个临界点后，会扩容2为之前的2倍， 原理跟HashMap扩容类似。
+
+当线程执行到rehash方法时，表示当前线程已经获取到到当前Segment的锁对象，这就表示rehash方法的执行是线程安全，不会存在并发问题。
+
+### 1.8之后concurrentHashMap
+
+jdk8版本的HashMap相对于jdk7版本发生了挺大的变化，所以不例外concurrenthashmap也发生了很大的改动。
+
+主要体现在jdk8舍弃的segment的设计，采用了CAS+synchronized来保证并发安全性。
