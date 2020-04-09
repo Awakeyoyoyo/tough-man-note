@@ -1911,7 +1911,7 @@ put方法的主要逻辑：
 final V put(K key, int hash, V value, boolean onlyIfAbsent) {
   //调用tryLock()方法获取锁
             HashEntry<K,V> node = tryLock() ? null :
-                scanAndLockForPut(key, hash, value);//tryLock不成功时会遍历定位到的HashEnry位置的链表（遍历主要是为了使CPU缓存链表），若找不到，则创建HashEntry。tryLock一定次数后（MAX_SCAN_RETRIES变量决定），则lock。若遍历过程中，由于其他线程的操作导致链表头结点变化，则需要重新遍历。
+                scanAndLockForPut(key, hash, value);//tryLock不成功时会遍历定位到的当前segement中的链表（遍历主要是为了使CPU缓存链表），若找不到，则创建HashEntry。tryLock一定次数后（MAX_SCAN_RETRIES变量决定），则lock。阻塞该线程，知道线程获取锁，若遍历过程中，由于其他线程的操作导致链表头结点变化，则需要重新遍历。
             V oldValue;
             try {
                 HashEntry<K,V>[] tab = table;
@@ -1983,6 +1983,7 @@ private HashEntry<K,V> scanAndLockForPut(K key, int hash, V value) {
         lock();
         break;
     }
+      //头节点发生了变化=。= 需要重新遍历
     else if ((retries & 1) == 0 &&
          (f = entryForHash(this, hash)) != first) {
         e = first = f; // re-traverse if entry changed
@@ -2031,8 +2032,191 @@ ConcurrentHashMap的扩容跟HashMap有点不同， ConcurrentHashMap的Segment�
 
 当线程执行到rehash方法时，表示当前线程已经获取到到当前Segment的锁对象，这就表示rehash方法的执行是线程安全，不会存在并发问题。
 
+#### 下面贴出一下执行get操作线程安全的情景。来源于：https://www.jianshu.com/p/1e1a96075256
+
+ **1：一线程执行put，另一个线程执行get**
+ ConcurrentHashMap约定新添的节点是在链表的表头， 所以如果先执行get，后执行put， get操作已经遍历到链表中间了， 不会影响put的安全执行。如果先执行put，这时候，就必须保证刚刚插入的表头节点能被读取，ConcurrentHashMap使用的UNSAFE.putOrderedObject赋值方式保证。
+** 2：一个线程执行put，并在扩容操作期间， 另一个线程执行get**
+ ConcurrentHashMap扩容是新创建了HashEntry数组，然后进行迁移数据，最后面将 newTable赋值给oldTable。如果 get 先执行，那么就是在oldTable 上做查询操作，不发送线程安全问题；而如果put 先执行，那么 put 操作的可见性保证就是 oldTable使用了 volatile 关键字即可。
+
+```java
+transient volatile HashEntry<K,V>[] table;
+```
+
+**3:一线程执行remove，另一个线程执行get**
+ ConcurrentHashMap的删除分2种情况， 1>删除节点在链表表头。那操作节点就是HashEntry数组元素了，虽然HashEntry[] table 使用了volatile修饰， 但是， volatile并保证数据内部元素的操作可见性，所以只能使用UNSAFE 来操作元素。2>删除节点中标中间， 那么好办， 只需要保证节点中的next属性是volatile修饰即可
+
+```java
+    static final class HashEntry<K,V> {
+        final int hash;
+        final K key;
+        volatile V value;
+        volatile HashEntry<K,V> next;
+   }
+```
+
 ### 1.8之后concurrentHashMap
 
 jdk8版本的HashMap相对于jdk7版本发生了挺大的变化，所以不例外concurrenthashmap也发生了很大的改动。
 
 主要体现在jdk8舍弃的segment的设计，采用了CAS+synchronized来保证并发安全性。
+
+大体结构设计与1.8hashmap差不多，一个node数组默认16，桶中链表过长大于8会自动转化为红黑树
+
+#### put函数：
+
+```java
+final V putVal(K key, V value, boolean onlyIfAbsent) {
+        if (key == null || value == null) throw new NullPointerException();
+        int hash = spread(key.hashCode());
+        int binCount = 0;
+        //一个死循环，目的，并发情况下，也可以保障安全添加成功
+        //原理：cas算法的循环比较，直至成功
+        for (Node<K,V>[] tab = table;;) {
+            Node<K,V> f; int n, i, fh;
+            if (tab == null || (n = tab.length) == 0)
+                //第一次添加，先初始化node数组
+                tab = initTable();
+            else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+                //计算出table[i]无节点即无哈希冲突，创建节点
+                //casTabAt : 底层使用Unsafe.compareAndSwapObject 原子操作table[i]位置，如果为null，则添加新建的node节点，跳出循环，反之，再循环进入执行添加操作
+                if (casTabAt(tab, i, null,
+                             new Node<K,V>(hash, key, value, null)))
+                    break;                   
+            }
+          //存在哈希冲突
+            else if ((fh = f.hash) == MOVED)
+                 //如果当前处于拓展状态，返回拓展后的tab，然后再进入循环执行添加操作
+                tab = helpTransfer(tab, f);
+            else {
+                //链表中或红黑树中追加节点
+                V oldVal = null;
+                //使用synchronized 对 f 对象加锁(单独的痛)， 这个f = tabAt(tab, i = (n - 1) & hash) ：table[i] 的node对象，并发环境保证线程操作安全
+               //此处注意： 这里没有ReentrantLock，因为jdk1.8对synchronized 做了优化，其执行性能已经跟ReentrantLock不相上下。
+                synchronized (f) {
+                    if (tabAt(tab, i) == f) {
+                        //链表上追加节点
+                        if (fh >= 0) {
+                            binCount = 1;
+                            for (Node<K,V> e = f;; ++binCount) {
+                                K ek;
+                                if (e.hash == hash &&
+                                    ((ek = e.key) == key ||
+                                     (ek != null && key.equals(ek)))) {
+                                    oldVal = e.val;
+                                    if (!onlyIfAbsent)
+                                        e.val = value;
+                                    break;
+                                }
+                                Node<K,V> pred = e;
+                                if ((e = e.next) == null) {
+                                    pred.next = new Node<K,V>(hash, key,
+                                                              value, null);
+                                    break;
+                                }
+                            }
+                        }
+                        //红黑树上追加节点
+                        else if (f instanceof TreeBin) {
+                            Node<K,V> p;
+                            binCount = 2;
+                            if ((p = ((TreeBin<K,V>)f).putTreeVal(hash, key,
+                                                           value)) != null) {
+                                oldVal = p.val;
+                                if (!onlyIfAbsent)
+                                    p.val = value;
+                            }
+                        }
+                    }
+                }
+                if (binCount != 0) {
+                    //节点数大于临界值，转换成红黑树
+                    if (binCount >= TREEIFY_THRESHOLD)
+                        treeifyBin(tab, i);
+                    if (oldVal != null)
+                        return oldVal;
+                    break;
+                }
+            }
+        }
+        addCount(1L, binCount);
+        return null;
+    }
+
+```
+
+从put源码可看，JDK8版本更多使用的cas编程方式控制线程安全， 必要时也会使用synchronized 代码块保证线程安全。
+
+#### get源码：
+
+```java
+    public V get(Object key) {
+        Node<K,V>[] tab; Node<K,V> e, p; int n, eh; K ek;
+      //高16位与低16位进行与运算，保证发散
+        int h = spread(key.hashCode());
+        if ((tab = table) != null && (n = tab.length) > 0 &&
+            //获取table[i] 的node元素
+            (e = tabAt(tab, (n - 1) & h)) != null) {
+            if ((eh = e.hash) == h) {
+                if ((ek = e.key) == key || (ek != null && key.equals(ek)))
+                    return e.val;
+            }
+            else if (eh < 0)
+                return (p = e.find(h, key)) != null ? p.val : null;
+            while ((e = e.next) != null) {
+                if (e.hash == h &&
+                    ((ek = e.key) == key || (ek != null && key.equals(ek))))
+                    return e.val;
+            }
+        }
+        return null;
+    }
+
+```
+
+#### tabAt源码：
+
+```java
+//确保多线程可见，并且保证获取到是内存中最新的table[i] 元素值
+ static final <K,V> Node<K,V> tabAt(Node<K,V>[] tab, int i) {
+        return (Node<K,V>)U.getObjectVolatile(tab, ((long)i << ASHIFT) + ABASE);
+    }
+```
+
+该方法用来获取table数组中索引为i的Node元素
+
+#### treeifbin源码：
+
+```java
+private final void treeifyBin(Node<K,V>[] tab, int index) {
+        Node<K,V> b; int n, sc;
+        if (tab != null) {
+            if ((n = tab.length) < MIN_TREEIFY_CAPACITY)
+                tryPresize(n << 1);
+            else if ((b = tabAt(tab, index)) != null && b.hash >= 0) {
+              //添加锁防护
+                synchronized (b) {
+                    if (tabAt(tab, index) == b) {
+                        TreeNode<K,V> hd = null, tl = null;
+                        for (Node<K,V> e = b; e != null; e = e.next) {
+                            TreeNode<K,V> p =
+                                new TreeNode<K,V>(e.hash, e.key, e.val,
+                                                  null, null);
+                            if ((p.prev = tl) == null)
+                                hd = p;
+                            else
+                                tl.next = p;
+                            tl = p;
+                        }
+                        setTabAt(tab, index, new TreeBin<K,V>(hd));
+                    }
+                }
+            }
+        }
+    }
+```
+
+### jdk1.8 ConcurrentHashMap总结
+
+1.8的ConcurrentHashMap总结起来呢：就是get方法不加锁、put方法、treeifyBin方法(转为二叉树)使用锁。摒弃了segment臃肿的设计，这种设计在定位到具体的桶时，要先定位到具体的segment，然后再在segment中定位到具体的桶。而到了1.8的时候是针对的是Node[] tale数组中的每一个桶。使用3个CAS操作来确保node的一些操作的原子性，这种方式代替了锁。采用synchronized而不是ReentrantLock
+
